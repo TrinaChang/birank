@@ -3,7 +3,71 @@ import numpy as np
 import scipy
 import scipy.sparse as spa
 
-def centrality(listOfW, listOfZ, theta=0.85, delta=0.85, phi=0.85, gamma=0.85, lamb=0.85, xi=0.85, max_iter=200):
+def cross_layer(listOfW, pCrossWeight, uCrossWeight, theta=0.85, delta=0.85, phi=0.85, lamb=0.85, max_iter=200):
+        WTList = []
+        spList = []
+        sdList = []
+        p0List = []
+        u0List = []
+        p_lastList = []
+        u_lastList = []
+        for W in listOfW:
+            W = W.astype('float', copy=False)
+            WT = W.T
+            WTList.append(WT)
+            # dp and du(sum of edges)
+            kp = np.array(W.sum(axis=1)).flatten()
+            ku = np.array(W.sum(axis=0)).flatten()
+            # avoid divide by 0
+            kp[np.where(kp==0)] += 1
+            ku[np.where(ku==0)] += 1
+
+            kp_ = spa.diags(1/kp)
+            ku_ = spa.diags(1/ku)
+
+            kp_bi = spa.diags(1/np.lib.scimath.sqrt(kp))
+            ku_bi = spa.diags(1/np.lib.scimath.sqrt(ku))
+            S = ku_bi.dot(W).dot(kp_bi)
+            sdList.append(S)
+            spList.append(S.T)            
+
+            p0 = np.repeat(1 / kp_.shape[0], kp_.shape[0])
+            p0List.append(p0)
+            p_lastList.append(p0.copy())
+            u0 = np.repeat(1 / ku_.shape[0], ku_.shape[0])
+            u0List.append(u0)
+            u_lastList.append(u0.copy())
+        
+        pCrossWeight = pCrossWeight.astype('float', copy=False)
+        uCrossWeight = uCrossWeight.astype('float', copy=False)
+        crossList = []
+        crossList.append(np.array(pCrossWeight.sum(axis=1)).flatten()) # col alpha dpA
+        crossList.append(np.array(pCrossWeight.sum(axis=0)).flatten()) # dpB
+        crossList.append(np.array(uCrossWeight.sum(axis=1)).flatten()) # duA
+        crossList.append(np.array(uCrossWeight.sum(axis=0)).flatten()) # duB
+        for matrix in crossList:
+            matrix[np.where(matrix==0)] += 1
+            matrix = spa.diags(1/np.lib.scimath.sqrt(matrix))
+        spAB = crossList[1].dot(pCrossWeight).dot(crossList[0])
+        suAB = crossList[3].dot(uCrossWeight).dot(crossList[2])
+
+        p = [0]*len(listOfW)
+        u = [0]*len(listOfW)
+        for i in range(max_iter):
+            for layer in range(len(listOfW)):
+                if (layer == 0):
+                    factorP = spAB.dot(p[1])
+                    factorU = suAB.dot(u[1])
+                else:
+                    factorP = spAB.dot(p[0])
+                    factorU = suAB.dot(u[0])
+                p[layer] = theta * spList[layer].dot(u_lastList[layer]) + delta * factorP + (1 - theta - delta) * p0List[layer]
+                u[layer] = phi * sdList[layer].dot(p_lastList[layer]) + lamb * factorU + (1 - phi - lamb) * u0List[layer]
+                p_lastList[layer] = p[layer]
+                u_lastList[layer] = u[layer]
+        return p, u
+
+def centrality(listOfW, listOfZ, theta=0.425, delta=0.425, phi=0.425, gamma=0.425, lamb=0.425, xi=0.425, max_iter=200):
     # List for different layers
     WTList = []
     spList = []
@@ -36,9 +100,9 @@ def centrality(listOfW, listOfZ, theta=0.85, delta=0.85, phi=0.85, gamma=0.85, l
 
         kp_bi = spa.diags(1/np.lib.scimath.sqrt(kp))
         ku_bi = spa.diags(1/np.lib.scimath.sqrt(ku))
-        Sp = kp_bi.dot(WT).dot(ku_bi)
-        spList.append(Sp)
-        sdList.append(Sp.T)
+        Sp = ku_bi.dot(W).dot(kp_bi)
+        sdList.append(Sp)
+        spList.append(Sp.T)
 
         p0 = np.repeat(1 / kp_.shape[0], kp_.shape[0])
         p0List.append(p0)
@@ -58,7 +122,9 @@ def centrality(listOfW, listOfZ, theta=0.85, delta=0.85, phi=0.85, gamma=0.85, l
             
             p_lastList[layer] = p[layer]
             u_lastList[layer] = u[layer]
-            
+            p[layer] /= sum(p[layer])
+            u[layer] /= sum(u[layer])
+        z /= sum(z)
     
     return p, u, z
 
@@ -115,7 +181,9 @@ class BipartiteNetwork:
             print(top_df[[self.top_col, self.top_col + '_birank']])
             print(bottom_df[[self.bottom_col, self.bottom_col + '_birank']])
             counter += 1
-
+    
+    def generate_birank_cross_layer():
+        pass
 df = pd.read_csv('data.csv', names=['color', 'product', 'weight', 'country'])
 dfImportance = pd.read_csv('importance.csv', names=['country', 'importance'])
 bn = BipartiteNetwork()
