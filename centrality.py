@@ -90,7 +90,7 @@ def centrality(listOfW, listOfZ, theta=0.425, delta=0.425, phi=0.425, gamma=0.42
         ku = np.array(W.sum(axis=0)).flatten()
         totalW = sum(kp)
         betaP.append(kp / totalW)
-        betaU.append(kp / totalW)
+        betaU.append(ku / totalW)
         # avoid divide by 0
         kp[np.where(kp==0)] += 1
         ku[np.where(ku==0)] += 1
@@ -100,10 +100,9 @@ def centrality(listOfW, listOfZ, theta=0.425, delta=0.425, phi=0.425, gamma=0.42
 
         kp_bi = spa.diags(1/np.lib.scimath.sqrt(kp))
         ku_bi = spa.diags(1/np.lib.scimath.sqrt(ku))
-        Sp = ku_bi.dot(W).dot(kp_bi)
-        sdList.append(Sp)
-        spList.append(Sp.T)
-
+        Sp = ku_bi.dot(W).dot(kp_bi) #?
+        spList.append(Sp) #?
+        sdList.append(Sp.T) #?
         p0 = np.repeat(1 / kp_.shape[0], kp_.shape[0])
         p0List.append(p0)
         p_lastList.append(p0.copy())
@@ -112,18 +111,17 @@ def centrality(listOfW, listOfZ, theta=0.425, delta=0.425, phi=0.425, gamma=0.42
         u_lastList.append(u0.copy())
     p = [0]*len(listOfW)
     u = [0]*len(listOfW)
-    z = [0]*len(listOfW)
+    z = [1]*len(listOfW)
     for i in range(max_iter):
         # layer from a,b, ....
         for layer in range(len(listOfW)):
-            p[layer] = theta * spList[layer].dot(u_lastList[layer]) + delta * p_lastList[layer] * listOfZ[layer] + (1 - theta - delta) * p0List[layer]
-            u[layer] = phi * sdList[layer].dot(p_lastList[layer]) + gamma * u_lastList[layer] * listOfZ[layer] + (1 - phi - gamma) * u0List[layer]
-            z[layer] = lamb * betaP[layer].dot(u_lastList[layer]) + xi * betaU[layer].dot(p_lastList) + (1 - lamb - xi) * listOfZ[layer]
-            
-            p_lastList[layer] = p[layer]
-            u_lastList[layer] = u[layer]
+            p[layer] = theta * spList[layer].dot(u_lastList[layer]) + delta * p_lastList[layer].dot(np.array(z)) + (1 - theta - delta) * p0List[layer]
+            u[layer] = phi * sdList[layer].dot(p_lastList[layer]) + gamma * u_lastList[layer].dot(np.array(z)) + (1 - phi - gamma) * u0List[layer]
+            z[layer] = lamb * betaP[layer].dot(u_lastList[layer]) + xi * betaU[layer].dot(p_lastList[layer]) + (1 - lamb - xi) * listOfZ[layer]
             p[layer] /= sum(p[layer])
             u[layer] /= sum(u[layer])
+            p_lastList[layer] = p[layer]
+            u_lastList[layer] = u[layer]
         z /= sum(z)
     
     return p, u, z
@@ -188,4 +186,4 @@ df = pd.read_csv('data.csv', names=['color', 'product', 'weight', 'country'])
 dfImportance = pd.read_csv('importance.csv', names=['country', 'importance'])
 bn = BipartiteNetwork()
 bn.set_edgelist(df, 'color', 'product', 'country', 'importance', dfImportance, 'weight')
-bn.generate_birank()
+bn.generate_birank(max_iter=2)
