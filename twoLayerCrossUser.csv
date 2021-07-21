@@ -1,0 +1,9 @@
+"ipad","ipad",1
+"ipad","iphone",2
+"ipad","imac",1
+"iphone","ipad",2
+"iphone","iphone",3
+"iphone","imac",1
+"imac","ipad",2
+"imac","iphone",4
+"imac","imac",5

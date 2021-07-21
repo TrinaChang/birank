@@ -1,0 +1,14 @@
+"silver","silver",3
+"silver","black",2
+"silver","grey",1
+"silver","blue",2
+"black","silver",2
+"black","black",1
+"black","blue",1
+"grey","black",1
+"grey","grey",3
+"blue","silver",2
+"blue","black",4
+"blue","grey",2
+"blue","blue",1
+
